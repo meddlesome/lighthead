@@ -1,0 +1,11 @@
+services:
+  lighthead:
+    build: .
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - NODE_ENV=production
+    env_file:
+      - .env
+    restart: unless-stopped

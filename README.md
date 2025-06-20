@@ -88,6 +88,37 @@ npm run server:dev
 cp .env.example .env
 ```
 
+### 🐳 Docker Setup
+
+Run Lighthead as a containerized service:
+
+```bash
+# Clone and setup
+git clone <repository-url>
+cd lighthead
+
+# Configure environment (optional)
+cp .env.example .env
+# Edit .env to set PORT and API_KEY
+
+# Build the image
+docker compose build
+
+# Run the service
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop the service
+docker compose down
+```
+
+**Docker Environment Variables:**
+- `PORT` - Server port (default: 3005)
+- `API_KEY` - Optional API authentication key
+- `NODE_ENV` - Set to `production` for production builds
+
 ### Quick API Examples
 
 ```bash

@@ -145,10 +145,17 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
       );
     }
     
-    browser = await chromium.launch({
+    const launchOptions: any = {
       headless: true,
       args: launchArgs
-    });
+    };
+    
+    // Use system Chromium if environment variable is set
+    if (process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH) {
+      launchOptions.executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+    }
+    
+    browser = await chromium.launch(launchOptions);
     
     const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
     
