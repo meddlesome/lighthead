@@ -17,7 +17,7 @@ interface ResponseInfo {
   headers: Record<string, string>;
 }
 
-interface ScrapeOptions {
+export interface ScrapeOptions {
   verbose?: boolean;
   followRedirects?: boolean;
   cookieFile?: string | null;
@@ -195,6 +195,30 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
     
     const page: Page = await context.newPage();
     
+    // Handle PDF downloads
+    let downloadInfo: any = null;
+    page.on('download', async (download) => {
+      if (verbose) {
+        console.error('Download started:', download.url());
+      }
+      try {
+        const downloadPath = await download.path();
+        const buffer = downloadPath ? fs.readFileSync(downloadPath) : Buffer.alloc(0);
+        downloadInfo = {
+          buffer,
+          filename: download.suggestedFilename(),
+          url: download.url()
+        };
+        if (verbose) {
+          console.error('Download completed:', downloadInfo.filename);
+        }
+      } catch (error) {
+        if (verbose) {
+          console.error('Download error:', (error as Error).message);
+        }
+      }
+    });
+    
     if (stealth) {
       await page.addInitScript(() => {
         Object.defineProperty(navigator, 'webdriver', {
@@ -291,6 +315,11 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
       gotoOptions.waitUntil = 'commit';
     }
     
+    // For PDF URLs, use 'commit' to avoid ERR_ABORTED
+    if (url.toLowerCase().includes('.pdf')) {
+      gotoOptions.waitUntil = 'commit';
+    }
+    
     if (stealth) {
       await page.setExtraHTTPHeaders({
         'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
@@ -299,10 +328,41 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
       });
     }
     
-    const response = await page.goto(url, gotoOptions);
+    let response: Response | null = null;
+    try {
+      response = await page.goto(url, gotoOptions);
+    } catch (error) {
+      // For PDFs, ERR_ABORTED might be expected when download is triggered
+      if (url.toLowerCase().includes('.pdf') && (error as Error).message.includes('ERR_ABORTED')) {
+        if (verbose) {
+          console.error('Navigation aborted (expected for PDF download)');
+        }
+        // Wait for download to complete
+        await page.waitForTimeout(3000);
+        
+        if (downloadInfo) {
+          // Create a mock response for the download case
+          response = {
+            url: () => url,
+            status: () => 200,
+            statusText: () => 'OK',
+            headers: () => ({ 'content-type': 'application/pdf' })
+          } as any;
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    }
     
     if (!response) {
       throw new Error('Failed to load page');
+    }
+    
+    // Wait a bit for download to complete if triggered
+    if (url.toLowerCase().includes('.pdf')) {
+      await page.waitForTimeout(1000);
     }
     
     if (stealth) {
@@ -324,6 +384,46 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
         console.error(`${i + 1}. ${redirect.status} ${redirect.from} -> ${redirect.to}`);
       });
       console.error('Final URL:', response.url());
+    }
+    
+    // Check if we have download info from the download event
+    if (downloadInfo) {
+      if (verbose) {
+        console.error('\n=== DOWNLOAD COMPLETED ===');
+        console.error('Downloaded file:', downloadInfo.filename);
+        console.error('Buffer size:', downloadInfo.buffer.length, 'bytes');
+      }
+      
+      const result: BinaryResult = {
+        type: 'binary',
+        buffer: downloadInfo.buffer,
+        filename: downloadInfo.filename || `download_${Date.now()}.pdf`,
+        contentType: 'application/pdf',
+        url,
+        finalUrl: response.url(),
+        redirectChain,
+        response: {
+          status: response.status(),
+          statusText: response.statusText(),
+          headers: response.headers()
+        }
+      };
+      
+      if (cookieFile) {
+        try {
+          const cookies = await context.cookies();
+          fs.writeFileSync(cookieFile, JSON.stringify(cookies, null, 2));
+          if (verbose) {
+            console.error('Saved', cookies.length, 'cookies to', cookieFile);
+          }
+        } catch (error) {
+          if (verbose) {
+            console.error('Failed to save cookies:', (error as Error).message);
+          }
+        }
+      }
+      
+      return result;
     }
     
     const contentType = response.headers()['content-type'] || '';
@@ -432,6 +532,35 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
   }
 }
 
+function validateUrl(url: string): void {
+  try {
+    const parsedUrl = new URL(url);
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+      throw new Error('URL must use HTTP or HTTPS protocol');
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Invalid URL format');
+    }
+    throw error;
+  }
+}
+
+function validateFormat(format: string): void {
+  const validFormats = ['html', 'markdown', 'md', 'text', 'txt'];
+  if (!validFormats.includes(format.toLowerCase())) {
+    throw new Error(`Invalid format: ${format}. Valid formats are: ${validFormats.join(', ')}`);
+  }
+}
+
+function validateMaxRedirects(value: string): number {
+  const num = parseInt(value);
+  if (isNaN(num) || num < 0 || num > 100) {
+    throw new Error('max-redirects must be a number between 0 and 100');
+  }
+  return num;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   
@@ -469,16 +598,55 @@ Examples:
   const download = args.includes('--download');
   const followRedirects = !args.includes('--no-redirects');
   const stealth = !args.includes('--no-stealth');
-  const format = args.includes('--format') ? args[args.indexOf('--format') + 1] : 'html';
-  const outputFile = args.includes('--output') ? args[args.indexOf('--output') + 1] : null;
-  const cookieFile = args.includes('--cookies') ? args[args.indexOf('--cookies') + 1] : null;
-  const maxRedirects = args.includes('--max-redirects') ? parseInt(args[args.indexOf('--max-redirects') + 1]) || 10 : 10;
+  
+  let format = 'html';
+  if (args.includes('--format')) {
+    const formatIndex = args.indexOf('--format');
+    if (formatIndex + 1 >= args.length) {
+      throw new Error('--format requires a value');
+    }
+    format = args[formatIndex + 1];
+    validateFormat(format);
+  }
+  
+  let outputFile: string | null = null;
+  if (args.includes('--output')) {
+    const outputIndex = args.indexOf('--output');
+    if (outputIndex + 1 >= args.length) {
+      throw new Error('--output requires a file path');
+    }
+    outputFile = args[outputIndex + 1];
+  }
+  
+  let cookieFile: string | null = null;
+  if (args.includes('--cookies')) {
+    const cookiesIndex = args.indexOf('--cookies');
+    if (cookiesIndex + 1 >= args.length) {
+      throw new Error('--cookies requires a file path');
+    }
+    cookieFile = args[cookiesIndex + 1];
+  }
+  
+  let maxRedirects = 10;
+  if (args.includes('--max-redirects')) {
+    const maxRedirectsIndex = args.indexOf('--max-redirects');
+    if (maxRedirectsIndex + 1 >= args.length) {
+      throw new Error('--max-redirects requires a number');
+    }
+    maxRedirects = validateMaxRedirects(args[maxRedirectsIndex + 1]);
+  }
   
   const url = args.find(arg => !arg.startsWith('-') && 
     arg !== format && 
     arg !== outputFile &&
     arg !== cookieFile &&
-    arg !== maxRedirects.toString()) || args[0];
+    arg !== maxRedirects.toString());
+  
+  if (!url) {
+    throw new Error('URL is required');
+  }
+  
+  validateUrl(url);
   
   try {
     if (verbose) {

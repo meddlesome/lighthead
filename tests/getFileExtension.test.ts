@@ -1,129 +1,77 @@
 import { getFileExtension } from '../index';
 
 describe('getFileExtension', () => {
-  it('should return extension from URL path', () => {
-    const url = 'https://example.com/file.pdf';
-    const result = getFileExtension(url, 'application/pdf');
-    expect(result).toBe('.pdf');
+  describe('URL extension priority', () => {
+    it('should prioritize URL extension over MIME type', () => {
+      const url = 'https://example.com/file.pdf';
+      const result = getFileExtension(url, 'text/html');
+      expect(result).toBe('.pdf');
+    });
+
+    it('should fallback to MIME type when URL has no extension', () => {
+      const url = 'https://example.com/download';
+      const result = getFileExtension(url, 'image/jpeg');
+      expect(result).toBe('.jpg');
+    });
   });
 
-  it('should return extension from URL path ignoring content type', () => {
-    const url = 'https://example.com/document.docx';
-    const result = getFileExtension(url, 'application/octet-stream');
-    expect(result).toBe('.docx');
+  describe('MIME type mapping', () => {
+    it('should map common MIME types to extensions', () => {
+      const testCases = [
+        ['image/jpeg', '.jpg'],
+        ['image/png', '.png'],
+        ['image/gif', '.gif'],
+        ['image/webp', '.webp'],
+        ['application/pdf', '.pdf'],
+        ['application/zip', '.zip'],
+        ['text/plain', '.txt'],
+        ['application/json', '.json']
+      ];
+
+      testCases.forEach(([mimeType, expectedExt]) => {
+        const result = getFileExtension('https://example.com/file', mimeType);
+        expect(result).toBe(expectedExt);
+      });
+    });
   });
 
-  it('should return extension based on MIME type when URL has no extension', () => {
-    const url = 'https://example.com/download';
-    const result = getFileExtension(url, 'image/jpeg');
-    expect(result).toBe('.jpg');
+  describe('fallback behavior', () => {
+    it('should return .bin for unknown MIME types and empty content type', () => {
+      const testCases = [
+        ['application/unknown'],
+        [''],
+        ['invalid/type']
+      ];
+
+      testCases.forEach(([contentType]) => {
+        const result = getFileExtension('https://example.com/file', contentType);
+        expect(result).toBe('.bin');
+      });
+    });
   });
 
-  it('should handle PNG MIME type', () => {
-    const url = 'https://example.com/image';
-    const result = getFileExtension(url, 'image/png');
-    expect(result).toBe('.png');
-  });
+  describe('URL parsing edge cases', () => {
+    it('should handle complex URL structures', () => {
+      const testCases = [
+        ['https://example.com/file.jpg?v=123&size=large', '.jpg'],
+        ['https://example.com/document.pdf#page=1', '.pdf'],
+        ['https://example.com/FILE.PDF', '.pdf'], // case insensitive
+        ['https://example.com/path/to/nested/file.txt', '.txt'],
+        ['https://example.com/file.backup.txt', '.txt'], // multiple dots
+        ['https://example.com:8080/file.json', '.json'], // with port
+        ['http://localhost:3000/api/data.xml', '.xml'], // localhost
+        ['http://192.168.1.1/config.cfg', '.cfg'] // IP address
+      ];
 
-  it('should handle GIF MIME type', () => {
-    const url = 'https://example.com/animation';
-    const result = getFileExtension(url, 'image/gif');
-    expect(result).toBe('.gif');
-  });
+      testCases.forEach(([url, expectedExt]) => {
+        const result = getFileExtension(url, 'text/plain');
+        expect(result).toBe(expectedExt);
+      });
+    });
 
-  it('should handle WebP MIME type', () => {
-    const url = 'https://example.com/modern-image';
-    const result = getFileExtension(url, 'image/webp');
-    expect(result).toBe('.webp');
-  });
-
-  it('should handle PDF MIME type', () => {
-    const url = 'https://example.com/document';
-    const result = getFileExtension(url, 'application/pdf');
-    expect(result).toBe('.pdf');
-  });
-
-  it('should handle ZIP MIME type', () => {
-    const url = 'https://example.com/archive';
-    const result = getFileExtension(url, 'application/zip');
-    expect(result).toBe('.zip');
-  });
-
-  it('should handle plain text MIME type', () => {
-    const url = 'https://example.com/file';
-    const result = getFileExtension(url, 'text/plain');
-    expect(result).toBe('.txt');
-  });
-
-  it('should handle JSON MIME type', () => {
-    const url = 'https://example.com/data';
-    const result = getFileExtension(url, 'application/json');
-    expect(result).toBe('.json');
-  });
-
-  it('should return .bin for unknown MIME types', () => {
-    const url = 'https://example.com/mystery';
-    const result = getFileExtension(url, 'application/unknown');
-    expect(result).toBe('.bin');
-  });
-
-  it('should return .bin for empty content type', () => {
-    const url = 'https://example.com/file';
-    const result = getFileExtension(url, '');
-    expect(result).toBe('.bin');
-  });
-
-  it('should handle URLs with query parameters', () => {
-    const url = 'https://example.com/file.jpg?v=123&size=large';
-    const result = getFileExtension(url, 'image/png');
-    expect(result).toBe('.jpg');
-  });
-
-  it('should handle URLs with fragments', () => {
-    const url = 'https://example.com/document.pdf#page=1';
-    const result = getFileExtension(url, 'text/html');
-    expect(result).toBe('.pdf');
-  });
-
-  it('should handle case-insensitive extensions', () => {
-    const url = 'https://example.com/FILE.PDF';
-    const result = getFileExtension(url, 'text/html');
-    expect(result).toBe('.pdf');
-  });
-
-  it('should handle nested paths', () => {
-    const url = 'https://example.com/path/to/nested/file.txt';
-    const result = getFileExtension(url, 'application/octet-stream');
-    expect(result).toBe('.txt');
-  });
-
-  it('should handle URLs ending with slash', () => {
-    const url = 'https://example.com/folder/';
-    const result = getFileExtension(url, 'text/html');
-    expect(result).toBe('.bin');
-  });
-
-  it('should handle multiple dots in filename', () => {
-    const url = 'https://example.com/file.backup.txt';
-    const result = getFileExtension(url, 'application/pdf');
-    expect(result).toBe('.txt');
-  });
-
-  it('should handle URLs with port numbers', () => {
-    const url = 'https://example.com:8080/file.json';
-    const result = getFileExtension(url, 'text/plain');
-    expect(result).toBe('.json');
-  });
-
-  it('should handle localhost URLs', () => {
-    const url = 'http://localhost:3000/api/data.xml';
-    const result = getFileExtension(url, 'application/json');
-    expect(result).toBe('.xml');
-  });
-
-  it('should handle IP address URLs', () => {
-    const url = 'http://192.168.1.1/config.cfg';
-    const result = getFileExtension(url, 'text/plain');
-    expect(result).toBe('.cfg');
+    it('should return .bin for URLs without extensions', () => {
+      const result = getFileExtension('https://example.com/folder/', 'text/html');
+      expect(result).toBe('.bin');
+    });
   });
 });

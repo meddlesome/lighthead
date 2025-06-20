@@ -11,14 +11,21 @@
     "build": "tsc",
     "start": "npm run build && node dist/index.js",
     "dev": "ts-node index.ts",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:ci": "jest --ci --coverage --watchAll=false",
+    "server": "npm run build && node dist/server.js",
+    "server:dev": "ts-node server.ts",
+    "test": "jest --testPathIgnorePatterns=integration",
+    "test:integration": "jest --testPathPatterns=integration --runInBand",
+    "test:all": "jest --runInBand",
+    "test:watch": "jest --watch --testPathIgnorePatterns=integration",
+    "test:coverage": "jest --coverage --testPathIgnorePatterns=integration",
+    "test:ci": "jest --ci --coverage --watchAll=false --runInBand",
     "lint": "tsc --noEmit",
     "prepublishOnly": "npm run build && npm run test:ci"
   },
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "playwright-core": "^1.40.0"
   },
   "keywords": [
@@ -30,9 +37,13 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.3",
+    "@types/supertest": "^6.0.3",
     "jest": "^30.0.2",
+    "supertest": "^7.1.1",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

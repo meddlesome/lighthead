@@ -25,16 +25,10 @@ describe('htmlToMarkdown', () => {
     expect(result).toBe('Line 1\nLine 2\nLine 3');
   });
 
-  it('should convert bold and strong tags', () => {
-    const html = '<strong>Strong text</strong> and <b>bold text</b>';
+  it('should convert text formatting tags', () => {
+    const html = '<strong>Strong</strong> <b>bold</b> <em>emphasis</em> <i>italic</i>';
     const result = htmlToMarkdown(html);
-    expect(result).toBe('**Strong text** and **bold text**');
-  });
-
-  it('should convert italic and emphasis tags', () => {
-    const html = '<em>Emphasized text</em> and <i>italic text</i>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('*Emphasized text* and *italic text*');
+    expect(result).toBe('**Strong** **bold** *emphasis* *italic*');
   });
 
   it('should convert links', () => {
@@ -43,28 +37,20 @@ describe('htmlToMarkdown', () => {
     expect(result).toBe('[Example Link](https://example.com)');
   });
 
-  it('should convert images with alt text', () => {
-    const html = '<img src="image.jpg" alt="Alt text">';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('![Alt text](image.jpg)');
+  it('should convert images with and without alt text', () => {
+    const htmlWithAlt = '<img src="image.jpg" alt="Alt text">';
+    const htmlWithoutAlt = '<img src="image.jpg">';
+    
+    expect(htmlToMarkdown(htmlWithAlt)).toBe('![Alt text](image.jpg)');
+    expect(htmlToMarkdown(htmlWithoutAlt)).toBe('![](image.jpg)');
   });
 
-  it('should convert images without alt text', () => {
-    const html = '<img src="image.jpg">';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('![](image.jpg)');
-  });
-
-  it('should convert lists', () => {
-    const html = '<ul><li>Item 1</li><li>Item 2</li></ul>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('- Item 1\n- Item 2');
-  });
-
-  it('should convert ordered lists', () => {
-    const html = '<ol><li>First</li><li>Second</li></ol>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('- First\n- Second');
+  it('should convert both unordered and ordered lists', () => {
+    const unorderedHtml = '<ul><li>Item 1</li><li>Item 2</li></ul>';
+    const orderedHtml = '<ol><li>First</li><li>Second</li></ol>';
+    
+    expect(htmlToMarkdown(unorderedHtml)).toBe('- Item 1\n- Item 2');
+    expect(htmlToMarkdown(orderedHtml)).toBe('- First\n- Second');
   });
 
   it('should convert blockquotes', () => {
@@ -73,52 +59,29 @@ describe('htmlToMarkdown', () => {
     expect(result).toBe('> This is a quote');
   });
 
-  it('should convert inline code', () => {
-    const html = 'Use <code>console.log()</code> to debug';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('Use `console.log()` to debug');
+  it('should convert inline code and code blocks', () => {
+    const inlineHtml = 'Use <code>console.log()</code> to debug';
+    const blockHtml = '<pre>function hello() {\n  console.log("Hello");\n}</pre>';
+    
+    expect(htmlToMarkdown(inlineHtml)).toBe('Use `console.log()` to debug');
+    expect(htmlToMarkdown(blockHtml)).toBe('function hello() {\n  console.log("Hello");\n}');
   });
 
-  it('should convert code blocks', () => {
-    const html = '<pre>function hello() {\n  console.log("Hello");\n}</pre>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('function hello() {\n  console.log("Hello");\n}');
-  });
+  describe('content filtering', () => {
+    it('should remove unwanted HTML elements', () => {
+      const testCases = [
+        ['<p>Content</p><script>alert("bad")</script><p>More</p>', 'Content\n\nMore'],
+        ['<p>Content</p><style>body { color: red; }</style><p>More</p>', 'Content\n\nMore'],
+        ['<nav>Navigation</nav><p>Content</p>', 'Content'],
+        ['<header>Header</header><p>Content</p>', 'Content'],
+        ['<p>Content</p><footer>Footer</footer>', 'Content'],
+        ['<p>Content</p><aside>Sidebar</aside>', 'Content']
+      ];
 
-  it('should remove script tags', () => {
-    const html = '<p>Content</p><script>alert("bad")</script><p>More content</p>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('Content\n\nMore content');
-  });
-
-  it('should remove style tags', () => {
-    const html = '<p>Content</p><style>body { color: red; }</style><p>More content</p>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('Content\n\nMore content');
-  });
-
-  it('should remove navigation elements', () => {
-    const html = '<nav>Navigation</nav><p>Content</p>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('Content');
-  });
-
-  it('should remove header elements', () => {
-    const html = '<header>Header</header><p>Content</p>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('Content');
-  });
-
-  it('should remove footer elements', () => {
-    const html = '<p>Content</p><footer>Footer</footer>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('Content');
-  });
-
-  it('should remove aside elements', () => {
-    const html = '<p>Content</p><aside>Sidebar</aside>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('Content');
+      testCases.forEach(([html, expected]) => {
+        expect(htmlToMarkdown(html)).toBe(expected);
+      });
+    });
   });
 
   it('should decode HTML entities', () => {
@@ -151,19 +114,15 @@ describe('htmlToMarkdown', () => {
     expect(result).toContain('`inline code`');
   });
 
-  it('should handle empty input', () => {
-    const result = htmlToMarkdown('');
-    expect(result).toBe('');
-  });
+  describe('edge cases', () => {
+    it('should handle special inputs correctly', () => {
+      expect(htmlToMarkdown('')).toBe('');
+      expect(htmlToMarkdown('Just plain text')).toBe('Just plain text');
+    });
 
-  it('should handle plain text', () => {
-    const result = htmlToMarkdown('Just plain text');
-    expect(result).toBe('Just plain text');
-  });
-
-  it('should normalize excessive newlines', () => {
-    const html = '<p>Para 1</p>\n\n\n<p>Para 2</p>';
-    const result = htmlToMarkdown(html);
-    expect(result).toBe('Para 1\n\nPara 2');
+    it('should normalize excessive newlines', () => {
+      const html = '<p>Para 1</p>\n\n\n<p>Para 2</p>';
+      expect(htmlToMarkdown(html)).toBe('Para 1\n\nPara 2');
+    });
   });
 });

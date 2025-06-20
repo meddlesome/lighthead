@@ -1,231 +1,168 @@
-# Lighthead
+# 🚀 Lighthead
 
-Lightweight headless web scraper with minimal resource usage using Playwright. Designed to bypass modern bot detection systems while maintaining optimal performance. Built with TypeScript for enhanced reliability and type safety.
+A lightweight, TypeScript-powered headless web scraper that bypasses modern bot detection while maintaining minimal resource usage. Perfect for data extraction, content migration, and automated testing.
 
-## Features
+## ✨ Key Features
 
-- **TypeScript**: Full TypeScript implementation with type safety and comprehensive testing
-- **Lightweight**: Uses `playwright-core` for minimal footprint
-- **Multiple Output Formats**: HTML, Markdown, and plain text
-- **Binary File Support**: Download PDFs, images, and other files
-- **Bot Detection Evasion**: Built-in stealth mode to bypass Akamai and similar protections
-- **Redirect Handling**: Automatic redirect following with detailed tracking
-- **Cookie Management**: Persistent cookie storage and session management
-- **Verbose Debugging**: Detailed HTTP request/response logging
-- **Headless Operation**: Optimized for low-resource servers
-- **Comprehensive Testing**: Unit tests with Jest and coverage reporting
+- **🛡️ Bot Detection Evasion** - Bypass Akamai, Cloudflare, and other protection systems
+- **⚡ High Performance** - Minimal footprint using `playwright-core`
+- **📝 Multiple Formats** - Output as HTML, Markdown, or plain text
+- **📁 Binary Support** - Download PDFs, images, and other files
+- **🔗 Smart Redirects** - Automatic redirect following with tracking
+- **🍪 Session Management** - Persistent cookie storage
+- **🔍 Verbose Debugging** - Detailed HTTP request/response logging
+- **🌐 REST API** - Built-in Express server for integration
+- **📊 TypeScript** - Full type safety with comprehensive testing
 
-## Installation
+## 🚀 Quick Start
 
 ```bash
+# Install and setup
 npm install
 npx playwright install chromium
-npm run build  # Compile TypeScript to JavaScript
-```
 
-## Usage
-
-### Basic Usage
-```bash
-# Basic HTML scraping
+# Basic scraping
 npm start -- https://example.com
 
-# Output as Markdown
-npm start -- https://example.com --format markdown
-
-# Save to file
-npm start -- https://example.com --format text --output content.txt
-
-# Download binary files
-npm start -- https://example.com/document.pdf --download
-```
-
-### Development Usage
-```bash
-# Run directly from TypeScript (development)
-npm run dev https://example.com
-
-# Or use the compiled version
-node dist/index.js https://example.com
-```
-
-### Advanced Features
-```bash
-# Verbose mode (shows HTTP details)
-npm start -- -v https://example.com
-
-# Use persistent cookies
-npm start -- https://example.com --cookies session.json
-
-# Disable redirect following
-npm start -- https://example.com --no-redirects
-
-# Disable stealth mode
-npm start -- https://example.com --no-stealth
-
-# Combine multiple options
+# Advanced usage with stealth mode
 npm start -- -v https://protected-site.com --format markdown --cookies auth.json
 ```
 
-### Command Line Options
-```
-Usage: lighthead <url> [options]
+## 💻 CLI Usage
 
-Options:
-  --format <format>    Output format: html, markdown, text (default: html)
-  --output <file>      Save output to file
-  --download           Download binary files
-  --cookies <file>     Load/save cookies from/to JSON file
-  --no-redirects       Don't follow HTTP redirects
-  --max-redirects <n>  Maximum number of redirects to follow (default: 10)
-  --no-stealth         Disable stealth mode (bot detection evasion)
-  -v, --verbose        Enable verbose mode (show HTTP details)
-  --help, -h           Show this help message
-```
+### CLI Arguments
 
-## Bot Detection Evasion
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `<url>` | string | **required** | Target URL to scrape |
+| `--format <format>` | string | `html` | Output format: `html`, `markdown`, `text` |
+| `--output <file>` | string | `stdout` | Save output to file instead of stdout |
+| `--download` | flag | `false` | Download binary files (PDFs, images, etc.) |
+| `--cookies <file>` | string | `none` | Load/save cookies from/to JSON file |
+| `--no-redirects` | flag | `false` | Don't follow HTTP redirects (default: follow) |
+| `--max-redirects <n>` | number | `10` | Maximum number of redirects to follow |
+| `--no-stealth` | flag | `false` | Disable stealth mode (default: enabled) |
+| `-v, --verbose` | flag | `false` | Enable verbose mode (show HTTP details) |
+| `-h, --help` | flag | - | Show help message and exit |
 
-Lighthead includes advanced stealth capabilities to bypass modern bot detection systems:
-
-- **Browser Fingerprinting**: Realistic Chrome user agent and headers
-- **JavaScript Modification**: Hides automation indicators (`navigator.webdriver`)
-- **Human-like Behavior**: Random mouse movements, scrolling, and delays
-- **Proper Headers**: Sec-Fetch headers matching real browsers
-- **Viewport Simulation**: Realistic screen resolution and device properties
-
-Successfully tested against:
-- Akamai Bot Manager
-- Cloudflare Bot Management
-- Other common protection systems
-
-## Output Formats
-
-- `html` - Raw HTML content (default)
-- `markdown` - Converted to Markdown format with proper formatting
-- `text` - Plain text content only
-
-## Advanced Features
-
-### Cookie Management
-```bash
-# Save cookies for future requests
-npm start -- https://login-site.com --cookies session.json
-
-# Use saved cookies
-npm start -- https://protected-area.com --cookies session.json
-```
-
-### Redirect Handling
-```bash
-# Follow redirects (default behavior)
-npm start -- https://short.url/redirect
-
-# Don't follow redirects
-npm start -- https://short.url/redirect --no-redirects
-
-# Limit redirect depth
-npm start -- https://site.com --max-redirects 3
-```
-
-### Verbose Debugging
-The verbose mode (`-v`) provides detailed information about:
-- Browser launch process
-- HTTP request headers and method
-- Response status and headers
-- Redirect chain tracking
-- Content processing steps
-- Cookie operations
-
-## Performance Optimizations
-
-- Uses `playwright-core` instead of full Playwright package
-- Optimized browser launch arguments for minimal resource usage
-- Automatic browser cleanup and memory management
-- Efficient HTML to Markdown conversion without external dependencies
-- Network idle detection for faster scraping
-- Configurable timeouts and wait conditions
-
-## Binary File Handling
-
-When scraping binary files (PDFs, images, etc.), use the `--download` flag to save them locally. Without this flag, the tool will show file information instead of downloading.
+### CLI Examples
 
 ```bash
-# Download a PDF file
+# Output formats
+npm start -- https://example.com --format markdown
+npm start -- https://example.com --format text --output content.txt
+
+# Binary file downloads
 npm start -- https://example.com/document.pdf --download
 
-# Get binary file info without downloading
-npm start -- https://example.com/image.jpg
+# Session management
+npm start -- https://example.com --cookies session.json
+
+# Debugging and options
+npm start -- -v https://example.com --no-redirects --max-redirects 5
 ```
 
-## Use Cases
+## 🛡️ Bot Detection Evasion
 
-- **Web Scraping**: Extract content from websites with bot protection
-- **Content Migration**: Convert web pages to markdown for documentation
-- **Monitoring**: Check website content changes with cookie persistence
-- **Data Extraction**: Scrape protected sites that require session management
-- **Testing**: Validate website behavior under different conditions
+Lighthead bypasses modern protection systems through:
 
-## Development
+- **Browser Fingerprinting** - Realistic Chrome user agent and headers
+- **JavaScript Stealth** - Hides automation indicators
+- **Human Behavior** - Random mouse movements and delays
+- **Proper Headers** - Sec-Fetch headers matching real browsers
 
-### Building and Testing
+✅ **Tested Against:** Akamai Bot Manager, Cloudflare Bot Management, and more
+
+## 🌐 REST API
+
+Start the built-in server for easy integration:
 
 ```bash
-# Install dependencies
-npm install
+# Production server
+npm run server
 
-# Build TypeScript to JavaScript
+# Development server (with auto-reload)
+npm run server:dev
+
+# Configure (optional)
+cp .env.example .env
+```
+
+### Quick API Examples
+
+```bash
+# Basic scraping (returns markdown by default)
+curl "http://localhost:3005/scrape?url=https://example.com"
+
+# Get specific formats
+curl "http://localhost:3005/scrape?url=https://example.com&format=html"
+curl "http://localhost:3005/scrape?url=https://example.com&format=text"
+
+# Download PDF as binary
+curl "http://localhost:3005/scrape?url=https://example.com/doc.pdf&format=binary" -o doc.pdf
+```
+
+### API Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `url` | string | **required** | Target URL to scrape |
+| `format` | string | `markdown` | Output format: `html`, `markdown`, `text`, `binary` |
+| `followRedirects` | boolean | `true` | Follow HTTP redirects automatically (`true`/`false`) |
+| `maxRedirects` | number | `10` | Maximum number of redirects to follow |
+| `stealth` | boolean | `true` | Enable bot detection evasion (`true`/`false`) |
+
+**Authentication (optional):**
+- Add `X-API-Key` header or `apiKey` query parameter if `API_KEY` is set in environment
+
+### API Response Formats
+
+**Supported formats:** `html`, `markdown`, `text`, `binary`
+
+- **Default:** `markdown` (changed from `json` for better usability)
+- **All responses:** JSON format with content in the `output` field
+- **Binary files:** Direct download when `format=binary`, metadata when no format specified
+
+## 🎯 Use Cases
+
+- **Web Scraping** - Extract content from protected websites
+- **Content Migration** - Convert web pages to markdown
+- **Monitoring** - Track website changes with session persistence
+- **API Integration** - Use as a microservice in larger applications
+- **Testing** - Validate website behavior under different conditions
+
+## 🔧 Development
+
+```bash
+# Setup
+npm install
 npm run build
 
-# Run tests
-npm test
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run tests in watch mode (development)
-npm run test:watch
-
-# Type checking without compilation
-npm run lint
-
-# Development mode (TypeScript directly)
+# Development
 npm run dev https://example.com
+npm run server:dev  # API development server
+
+# Testing
+npm test              # Unit tests only
+npm run test:integration  # Integration tests only  
+npm run test:all      # All tests including integration
+npm run test:coverage # Coverage report
+npm run test:watch    # Watch mode for development
+npm run lint          # TypeScript type checking
 ```
 
-### Project Structure
+## 📄 License
 
-```
-lighthead/
-├── index.ts              # Main TypeScript source file
-├── dist/                 # Compiled JavaScript output
-├── tests/                # Comprehensive test suite
-│   ├── htmlToMarkdown.test.ts
-│   ├── getFileExtension.test.ts
-│   ├── cli.test.ts
-│   └── scrapeUrl.test.ts
-├── tsconfig.json         # TypeScript configuration
-├── jest.config.js        # Jest testing configuration
-└── package.json          # Dependencies and scripts
-```
+MIT License - see LICENSE file for details.
 
-### Available Scripts
+## 🤝 Contributing
 
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm start` - Build and run the compiled version
-- `npm run dev` - Run directly from TypeScript source
-- `npm test` - Run the test suite
-- `npm run test:coverage` - Run tests with coverage report
-- `npm run test:watch` - Run tests in watch mode
-- `npm run test:ci` - CI-friendly test execution
-- `npm run lint` - Type check without compilation
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Run `npm test` and `npm run lint`
+5. Submit a pull request
 
-### Testing
+---
 
-The project includes comprehensive unit tests covering:
-- HTML to Markdown conversion (20+ test cases)
-- File extension detection (20+ test cases)
-- CLI argument parsing (25+ test cases)
-- Error handling and edge cases
-- Type safety validation
-
-Coverage reports are generated in the `coverage/` directory.
+⭐ **Star this repo if you find it useful!**
