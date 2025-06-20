@@ -1,11 +1,24 @@
-// scrapeUrl function is tested via integration tests in server.integration.test.ts
-// Unit testing this function would require complex browser mocking that doesn't add value
-// beyond what integration tests already provide.
+import { scrapeUrl, ScrapeOptions } from '../index';
 
-describe('scrapeUrl', () => {
-  it('should be tested via integration tests', () => {
-    // This test exists to satisfy Jest's requirement for at least one test
-    // The actual scrapeUrl function is comprehensively tested in server.integration.test.ts
-    expect(true).toBe(true);
+describe('scrapeUrl error handling', () => {
+  it('should reject invalid URLs', async () => {
+    await expect(scrapeUrl('not-a-url')).rejects.toThrow();
+    await expect(scrapeUrl('')).rejects.toThrow();
+  });
+
+  it('should handle timeout gracefully', async () => {
+    const options: ScrapeOptions = { verbose: false };
+    // Using a non-routable IP to force timeout
+    await expect(scrapeUrl('http://10.255.255.1', options)).rejects.toThrow();
+  });
+
+  it('should validate options parameter', async () => {
+    const validUrl = 'https://httpbin.org/status/200';
+    
+    // Test invalid maxRedirects
+    await expect(scrapeUrl(validUrl, { maxRedirects: -1 })).rejects.toThrow();
+    
+    // Test invalid cookieFile path
+    await expect(scrapeUrl(validUrl, { cookieFile: '/nonexistent/path/cookies.json' })).rejects.toThrow();
   });
 });
