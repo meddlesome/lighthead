@@ -351,15 +351,21 @@ app.get('/scrape', authenticateApiKey, async (req, res): Promise<void> => {
   }
 });
 
-app.listen(PORT, () => {
-  const verboseMode = process.argv.includes('--verbose') || process.argv.includes('-v') || process.env.VERBOSE === 'true';
-  console.log(`Lighthead API server running on port ${PORT}`);
-  if (API_KEY) {
-    console.log('API key authentication is enabled');
-  } else {
-    console.log('API key authentication is disabled');
-  }
-  if (verboseMode) {
-    console.log('Verbose mode enabled for debugging');
-  }
-});
+// Export the app for testing
+export default app;
+
+// Only start the server if this file is run directly (not imported)
+if (require.main === module) {
+  app.listen(PORT, () => {
+    const verboseMode = process.argv.includes('--verbose') || process.argv.includes('-v') || process.env.VERBOSE === 'true';
+    console.log(`Lighthead API server running on port ${PORT}`);
+    if (API_KEY) {
+      console.log('API key authentication is enabled');
+    } else {
+      console.log('API key authentication is disabled');
+    }
+    if (verboseMode) {
+      console.log('Verbose mode enabled for debugging');
+    }
+  });
+}
