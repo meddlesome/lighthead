@@ -1,0 +1,40 @@
+{
+  "name": "lighthead",
+  "version": "1.0.0",
+  "description": "Lightweight headless web scraper with minimal resource usage",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "lighthead": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/index.js",
+    "dev": "ts-node index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run test:ci"
+  },
+  "dependencies": {
+    "playwright-core": "^1.40.0"
+  },
+  "keywords": [
+    "scraper",
+    "headless",
+    "lightweight",
+    "minimal"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.3",
+    "jest": "^30.0.2",
+    "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
