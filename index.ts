@@ -539,7 +539,7 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
   }
 }
 
-function validateUrl(url: string): void {
+export function validateUrl(url: string): void {
   try {
     const parsedUrl = new URL(url);
     if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
@@ -553,14 +553,14 @@ function validateUrl(url: string): void {
   }
 }
 
-function validateFormat(format: string): void {
+export function validateFormat(format: string): void {
   const validFormats = ['html', 'markdown', 'md', 'text', 'txt'];
   if (!validFormats.includes(format.toLowerCase())) {
     throw new Error(`Invalid format: ${format}. Valid formats are: ${validFormats.join(', ')}`);
   }
 }
 
-function validateMaxRedirects(value: string): number {
+export function validateMaxRedirects(value: string): number {
   const num = parseInt(value);
   if (isNaN(num) || num < 0 || num > 100) {
     throw new Error('max-redirects must be a number between 0 and 100');

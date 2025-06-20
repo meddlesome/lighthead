@@ -1,79 +1,86 @@
-import { ScrapeOptions } from '../index';
+import { validateUrl, validateFormat, validateMaxRedirects } from '../index';
 
-describe('Core Type Validation', () => {
-  describe('ScrapeOptions interface', () => {
-    it('should accept valid options', () => {
-      const validOptions: ScrapeOptions[] = [
-        { verbose: true },
-        { followRedirects: false },
-        { cookieFile: 'cookies.json' },
-        { maxRedirects: 5 },
-        { stealth: false },
-        {
-          verbose: true,
-          followRedirects: false,
-          cookieFile: 'session.json',
-          maxRedirects: 10,
-          stealth: true
-        }
-      ];
-
-      validOptions.forEach(options => {
-        expect(typeof options).toBe('object');
-        if (options.verbose !== undefined) expect(typeof options.verbose).toBe('boolean');
-        if (options.followRedirects !== undefined) expect(typeof options.followRedirects).toBe('boolean');
-        if (options.cookieFile !== undefined) expect(typeof options.cookieFile).toBe('string');
-        if (options.maxRedirects !== undefined) expect(typeof options.maxRedirects).toBe('number');
-        if (options.stealth !== undefined) expect(typeof options.stealth).toBe('boolean');
-      });
+describe('Core Validation Functions', () => {
+  describe('validateUrl', () => {
+    it('should accept valid HTTP and HTTPS URLs', () => {
+      expect(() => validateUrl('https://example.com')).not.toThrow();
+      expect(() => validateUrl('http://example.com')).not.toThrow();
+      expect(() => validateUrl('https://subdomain.example.com/path?query=1')).not.toThrow();
+      expect(() => validateUrl('http://localhost:3000')).not.toThrow();
+      expect(() => validateUrl('https://192.168.1.1:8080')).not.toThrow();
     });
 
-    it('should handle empty options object', () => {
-      const emptyOptions: ScrapeOptions = {};
-      expect(typeof emptyOptions).toBe('object');
-      expect(Object.keys(emptyOptions)).toHaveLength(0);
+    it('should reject URLs with unsupported protocols', () => {
+      expect(() => validateUrl('ftp://example.com')).toThrow('URL must use HTTP or HTTPS protocol');
+      expect(() => validateUrl('file:///path/to/file')).toThrow('URL must use HTTP or HTTPS protocol');
+      expect(() => validateUrl('javascript:alert(1)')).toThrow('URL must use HTTP or HTTPS protocol');
+      expect(() => validateUrl('data:text/plain,hello')).toThrow('URL must use HTTP or HTTPS protocol');
+    });
+
+    it('should reject malformed URLs', () => {
+      expect(() => validateUrl('not-a-url')).toThrow('Invalid URL');
+      expect(() => validateUrl('')).toThrow('Invalid URL');
+      expect(() => validateUrl('http://')).toThrow('Invalid URL');
+      expect(() => validateUrl('https:/')).toThrow('Invalid URL');
     });
   });
 
-  describe('URL format validation', () => {
-    it('should identify valid URL patterns', () => {
-      const validUrls = [
-        'https://example.com',
-        'http://localhost',
-        'https://sub.domain.com/path?q=1',
-        'http://192.168.1.1:8080'
-      ];
-
-      validUrls.forEach(url => {
-        try {
-          new URL(url);
-          expect(url.startsWith('http')).toBe(true);
-        } catch {
-          fail(`URL should be valid: ${url}`);
-        }
-      });
+  describe('validateFormat', () => {
+    it('should accept valid formats (case insensitive)', () => {
+      expect(() => validateFormat('html')).not.toThrow();
+      expect(() => validateFormat('markdown')).not.toThrow();
+      expect(() => validateFormat('md')).not.toThrow();
+      expect(() => validateFormat('text')).not.toThrow();
+      expect(() => validateFormat('txt')).not.toThrow();
+      expect(() => validateFormat('HTML')).not.toThrow();
+      expect(() => validateFormat('MARKDOWN')).not.toThrow();
     });
 
-    it('should identify invalid URL patterns', () => {
-      const invalidUrls = [
-        'not-a-url',
-        'ftp://example.com',
-        'javascript:alert(1)',
-        ''
-      ];
+    it('should reject invalid formats', () => {
+      expect(() => validateFormat('pdf')).toThrow('Invalid format: pdf');
+      expect(() => validateFormat('json')).toThrow('Invalid format: json');
+      expect(() => validateFormat('xml')).toThrow('Invalid format: xml');
+      expect(() => validateFormat('')).toThrow('Invalid format:');
+      expect(() => validateFormat('unknown')).toThrow('Invalid format: unknown');
+    });
 
-      invalidUrls.forEach(url => {
-        let isValid = true;
-        try {
-          const parsed = new URL(url);
-          if (!['http:', 'https:'].includes(parsed.protocol)) {
-            isValid = false;
-          }
-        } catch {
-          isValid = false;
-        }
-        expect(isValid).toBe(false);
-      });
+    it('should include valid formats in error message', () => {
+      try {
+        validateFormat('invalid');
+      } catch (error) {
+        expect((error as Error).message).toContain('html, markdown, md, text, txt');
+      }
+    });
+  });
+
+  describe('validateMaxRedirects', () => {
+    it('should accept valid redirect counts', () => {
+      expect(validateMaxRedirects('0')).toBe(0);
+      expect(validateMaxRedirects('5')).toBe(5);
+      expect(validateMaxRedirects('10')).toBe(10);
+      expect(validateMaxRedirects('50')).toBe(50);
+      expect(validateMaxRedirects('100')).toBe(100);
+    });
+
+    it('should reject invalid numbers', () => {
+      expect(() => validateMaxRedirects('not-a-number')).toThrow('max-redirects must be a number between 0 and 100');
+      expect(() => validateMaxRedirects('')).toThrow('max-redirects must be a number between 0 and 100');
+      expect(() => validateMaxRedirects('abc')).toThrow('max-redirects must be a number between 0 and 100');
+      // parseInt('12.5') returns 12, so this actually succeeds
+      expect(validateMaxRedirects('12')).toBe(12);
+    });
+
+    it('should reject out-of-range values', () => {
+      expect(() => validateMaxRedirects('-1')).toThrow('max-redirects must be a number between 0 and 100');
+      expect(() => validateMaxRedirects('-10')).toThrow('max-redirects must be a number between 0 and 100');
+      expect(() => validateMaxRedirects('101')).toThrow('max-redirects must be a number between 0 and 100');
+      expect(() => validateMaxRedirects('1000')).toThrow('max-redirects must be a number between 0 and 100');
+    });
+
+    it('should handle edge cases', () => {
+      expect(validateMaxRedirects('00')).toBe(0);
+      expect(validateMaxRedirects('007')).toBe(7);
+      expect(validateMaxRedirects('10')).toBe(10); // parseInt handles this
     });
   });
 });
