@@ -119,6 +119,10 @@ docker compose down
 - `API_KEY` - Optional API authentication key
 - `NODE_ENV` - Set to `production` for production builds
 
+### 🔗 Using with n8n
+
+When using Lighthead with n8n in separate Docker networks, use `http://host.docker.internal:3005/scrape` in your n8n HTTP Request node instead of `http://localhost:3005/scrape`.
+
 ### Quick API Examples
 
 ```bash

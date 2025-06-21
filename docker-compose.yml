@@ -9,3 +9,11 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+    networks:
+      - backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  backend:
+    driver: bridge
