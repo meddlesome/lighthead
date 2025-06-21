@@ -49,7 +49,25 @@ interface BinaryResult {
 
 type ScrapeResult = HtmlResult | BinaryResult;
 
-export function htmlToMarkdown(html: string): string {
+export function htmlToMarkdown(html: string, baseUrl?: string): string {
+  // Helper function to convert relative URLs to absolute URLs
+  const makeAbsoluteUrl = (url: string): string => {
+    if (!baseUrl || !url) return url;
+    
+    try {
+      // If URL is already absolute, return as-is
+      if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//')) {
+        return url.startsWith('//') ? 'https:' + url : url;
+      }
+      
+      // Handle relative URLs
+      return new URL(url, baseUrl).href;
+    } catch (error) {
+      // If URL construction fails, return original URL
+      return url;
+    }
+  };
+
   return html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -64,9 +82,9 @@ export function htmlToMarkdown(html: string): string {
     .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
     .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
     .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
-    .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
-    .replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi, '![$2]($1)')
-    .replace(/<img[^>]*src="([^"]*)"[^>]*>/gi, '![]($1)')
+    .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, (match, href, text) => `[${text}](${makeAbsoluteUrl(href)})`)
+    .replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi, (match, src, alt) => `![${alt}](${makeAbsoluteUrl(src)})`)
+    .replace(/<img[^>]*src="([^"]*)"[^>]*>/gi, (match, src) => `![](${makeAbsoluteUrl(src)})`)
     .replace(/<ul[^>]*>/gi, '')
     .replace(/<\/ul>/gi, '\n')
     .replace(/<ol[^>]*>/gi, '')
@@ -448,7 +466,7 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
       
       const html = await page.content();
       const textContent = await page.textContent('body') || '';
-      const markdown = htmlToMarkdown(html);
+      const markdown = htmlToMarkdown(html, response.url());
       
       if (verbose) {
         console.error('HTML size:', html.length, 'characters');

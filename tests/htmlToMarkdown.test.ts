@@ -37,12 +37,40 @@ describe('htmlToMarkdown', () => {
     expect(result).toBe('[Example Link](https://example.com)');
   });
 
+  it('should convert relative links to absolute URLs', () => {
+    const baseUrl = 'https://example.com/page';
+    const html = '<a href="/about">About</a> <a href="contact.html">Contact</a> <a href="../help">Help</a>';
+    const result = htmlToMarkdown(html, baseUrl);
+    expect(result).toBe('[About](https://example.com/about) [Contact](https://example.com/contact.html) [Help](https://example.com/help)');
+  });
+
+  it('should handle protocol-relative URLs', () => {
+    const baseUrl = 'https://example.com';
+    const html = '<a href="//cdn.example.com/resource">CDN Link</a>';
+    const result = htmlToMarkdown(html, baseUrl);
+    expect(result).toBe('[CDN Link](https://cdn.example.com/resource)');
+  });
+
+  it('should leave absolute URLs unchanged', () => {
+    const baseUrl = 'https://example.com';
+    const html = '<a href="https://other.com/page">External Link</a>';
+    const result = htmlToMarkdown(html, baseUrl);
+    expect(result).toBe('[External Link](https://other.com/page)');
+  });
+
   it('should convert images with and without alt text', () => {
     const htmlWithAlt = '<img src="image.jpg" alt="Alt text">';
     const htmlWithoutAlt = '<img src="image.jpg">';
     
     expect(htmlToMarkdown(htmlWithAlt)).toBe('![Alt text](image.jpg)');
     expect(htmlToMarkdown(htmlWithoutAlt)).toBe('![](image.jpg)');
+  });
+
+  it('should convert relative image URLs to absolute URLs', () => {
+    const baseUrl = 'https://example.com/page';
+    const html = '<img src="/images/logo.png" alt="Logo"> <img src="photo.jpg">';
+    const result = htmlToMarkdown(html, baseUrl);
+    expect(result).toBe('![Logo](https://example.com/images/logo.png) ![](https://example.com/photo.jpg)');
   });
 
   it('should convert both unordered and ordered lists', () => {
