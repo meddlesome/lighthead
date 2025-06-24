@@ -404,8 +404,30 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
       throw new Error('Failed to load page');
     }
     
+    // Log content status before waiting for network idle
+    if (verbose) {
+      try {
+        const contentPreview = await page.content();
+        console.error('\n=== CONTENT PREVIEW (before network idle) ===');
+        console.error('Content length:', contentPreview.length, 'characters');
+        console.error('Content preview:', contentPreview.substring(0, 200).replace(/\s+/g, ' '));
+        console.error('Page title:', await page.title());
+      } catch (e) {
+        console.error('Failed to get content preview:', (e as Error).message);
+      }
+    }
+
     // Wait for all network activity to settle after initial load
-    await page.waitForLoadState('networkidle');
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 10000 });
+      if (verbose) {
+        console.error('Network idle completed successfully');
+      }
+    } catch (error) {
+      if (verbose) {
+        console.error('Network idle timeout reached, proceeding...');
+      }
+    }
     
     // Wait a bit for download to complete if triggered
     if (url.toLowerCase().includes('.pdf')) {
