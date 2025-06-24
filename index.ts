@@ -4,6 +4,7 @@ import { chromium, Browser, BrowserContext, Page, Response } from 'playwright-co
 import * as fs from 'fs';
 import * as path from 'path';
 import { URL } from 'url';
+import TurndownService from 'turndown';
 
 interface RedirectInfo {
   from: string;
@@ -50,58 +51,76 @@ interface BinaryResult {
 type ScrapeResult = HtmlResult | BinaryResult;
 
 export function htmlToMarkdown(html: string, baseUrl?: string): string {
-  // Helper function to convert relative URLs to absolute URLs
-  const makeAbsoluteUrl = (url: string): string => {
-    if (!baseUrl || !url) return url;
-    
-    try {
-      // If URL is already absolute, return as-is
-      if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//')) {
-        return url.startsWith('//') ? 'https:' + url : url;
-      }
-      
-      // Handle relative URLs
-      return new URL(url, baseUrl).href;
-    } catch (error) {
-      // If URL construction fails, return original URL
-      return url;
-    }
-  };
+  const turndownService = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced'
+  });
 
-  return html
+  // Configure Turndown to handle URLs properly
+  if (baseUrl) {
+    turndownService.addRule('absoluteLinks', {
+      filter: ['a'],
+      replacement: (content: string, node: any) => {
+        const href = node.getAttribute('href');
+        if (!href) return content;
+        
+        // Skip JavaScript links (case-insensitive)
+        if (href.toLowerCase().startsWith('javascript:')) {
+          return content;
+        }
+        
+        let absoluteUrl = href;
+        try {
+          // If URL is already absolute, return as-is
+          if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) {
+            absoluteUrl = href.startsWith('//') ? 'https:' + href : href;
+          } else {
+            // Handle relative URLs
+            absoluteUrl = new URL(href, baseUrl).href;
+          }
+        } catch (error) {
+          // If URL construction fails, use original href
+          absoluteUrl = href;
+        }
+        
+        const linkText = content.trim() || href.split('/').pop() || 'Link';
+        return `[${linkText}](${absoluteUrl})`;
+      }
+    });
+
+    turndownService.addRule('absoluteImages', {
+      filter: ['img'],
+      replacement: (content: string, node: any) => {
+        const src = node.getAttribute('src');
+        const alt = node.getAttribute('alt') || '';
+        if (!src) return '';
+        
+        let absoluteUrl = src;
+        try {
+          if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//')) {
+            absoluteUrl = src.startsWith('//') ? 'https:' + src : src;
+          } else {
+            absoluteUrl = new URL(src, baseUrl).href;
+          }
+        } catch (error) {
+          absoluteUrl = src;
+        }
+        
+        return `![${alt}](${absoluteUrl})`;
+      }
+    });
+  }
+
+  // Remove unwanted elements before conversion
+  const cleanHtml = html
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
     .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
     .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
-    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '')
-    .replace(/<h([1-6])[^>]*>(.*?)<\/h[1-6]>/gi, (match, level, text) => '#'.repeat(parseInt(level)) + ' ' + text.trim() + '\n\n')
-    .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
-    .replace(/<br[^>]*>/gi, '\n')
-    .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
-    .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
-    .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
-    .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
-    .replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, (match, href, text) => `[${text}](${makeAbsoluteUrl(href)})`)
-    .replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi, (match, src, alt) => `![${alt}](${makeAbsoluteUrl(src)})`)
-    .replace(/<img[^>]*src="([^"]*)"[^>]*>/gi, (match, src) => `![](${makeAbsoluteUrl(src)})`)
-    .replace(/<ul[^>]*>/gi, '')
-    .replace(/<\/ul>/gi, '\n')
-    .replace(/<ol[^>]*>/gi, '')
-    .replace(/<\/ol>/gi, '\n')
-    .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
-    .replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '> $1\n\n')
-    .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
-    .replace(/<pre[^>]*>(.*?)<\/pre>/gi, '```\n$1\n```\n\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\n\s*\n\s*\n/g, '\n\n')
-    .trim();
+    .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+
+  return turndownService.turndown(cleanHtml);
 }
 
 export function getFileExtension(url: string, contentType: string): string {
@@ -332,7 +351,7 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
     });
     
     const gotoOptions: any = {
-      waitUntil: 'networkidle',
+      waitUntil: 'load',
       timeout: 60000
     };
     
@@ -384,6 +403,9 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
     if (!response) {
       throw new Error('Failed to load page');
     }
+    
+    // Wait for all network activity to settle after initial load
+    await page.waitForLoadState('networkidle');
     
     // Wait a bit for download to complete if triggered
     if (url.toLowerCase().includes('.pdf')) {
@@ -464,8 +486,33 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
         console.error('Processing HTML content...');
       }
       
-      const html = await page.content();
+      // Try to get the original response body before JavaScript modifications
+      let html: string;
+      let usingOriginal = false;
+      try {
+        html = await response.text();
+        usingOriginal = true;
+        if (verbose) {
+          console.error('Using original response HTML before JavaScript processing');
+        }
+      } catch (error) {
+        // Fallback to processed DOM if response.text() fails
+        html = await page.content();
+        usingOriginal = false;
+        if (verbose) {
+          console.error('Using processed DOM HTML after JavaScript');
+          console.error('Error from response.text():', (error as Error).message);
+        }
+      }
+      
+      // Add source info to help debug
+      if (verbose) {
+        console.error('HTML source:', usingOriginal ? 'original' : 'processed');
+      }
+      
       const textContent = await page.textContent('body') || '';
+      
+      // Use a simple but more robust approach for the original HTML
       const markdown = htmlToMarkdown(html, response.url());
       
       if (verbose) {

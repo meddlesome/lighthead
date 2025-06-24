@@ -22,13 +22,13 @@ describe('htmlToMarkdown', () => {
   it('should convert line breaks', () => {
     const html = 'Line 1<br>Line 2<br/>Line 3';
     const result = htmlToMarkdown(html);
-    expect(result).toBe('Line 1\nLine 2\nLine 3');
+    expect(result).toBe('Line 1  \nLine 2  \nLine 3');
   });
 
   it('should convert text formatting tags', () => {
     const html = '<strong>Strong</strong> <b>bold</b> <em>emphasis</em> <i>italic</i>';
     const result = htmlToMarkdown(html);
-    expect(result).toBe('**Strong** **bold** *emphasis* *italic*');
+    expect(result).toBe('**Strong** **bold** _emphasis_ _italic_');
   });
 
   it('should convert links', () => {
@@ -77,8 +77,8 @@ describe('htmlToMarkdown', () => {
     const unorderedHtml = '<ul><li>Item 1</li><li>Item 2</li></ul>';
     const orderedHtml = '<ol><li>First</li><li>Second</li></ol>';
     
-    expect(htmlToMarkdown(unorderedHtml)).toBe('- Item 1\n- Item 2');
-    expect(htmlToMarkdown(orderedHtml)).toBe('- First\n- Second');
+    expect(htmlToMarkdown(unorderedHtml)).toBe('*   Item 1\n*   Item 2');
+    expect(htmlToMarkdown(orderedHtml)).toBe('1.  First\n2.  Second');
   });
 
   it('should convert blockquotes', () => {
@@ -135,11 +135,85 @@ describe('htmlToMarkdown', () => {
     const result = htmlToMarkdown(html);
     expect(result).toContain('# Main Title');
     expect(result).toContain('**paragraph**');
-    expect(result).toContain('*mixed*');
-    expect(result).toContain('- First item');
+    expect(result).toContain('_mixed_');
+    expect(result).toContain('*   First item');
     expect(result).toContain('[a link](https://example.com)');
     expect(result).toContain('This is a quote');
     expect(result).toContain('`inline code`');
+  });
+
+  describe('turndown-specific features', () => {
+    it('should use ATX-style headings', () => {
+      const html = '<h1>Header 1</h1><h2>Header 2</h2>';
+      const result = htmlToMarkdown(html);
+      expect(result).toBe('# Header 1\n\n## Header 2');
+    });
+
+    it('should use fenced code blocks', () => {
+      const html = '<pre><code>function test() {\n  return true;\n}</code></pre>';
+      const result = htmlToMarkdown(html);
+      expect(result).toContain('```');
+    });
+
+    it('should escape markdown characters in text', () => {
+      const html = '<p>Text with * asterisk _ underscore # hash</p>';
+      const result = htmlToMarkdown(html);
+      expect(result).toBe('Text with \\* asterisk \\_ underscore # hash');
+    });
+
+    it('should handle links without href gracefully', () => {
+      const html = '<a>Link without href</a>';
+      const result = htmlToMarkdown(html);
+      expect(result).toBe('Link without href');
+    });
+
+    it('should handle empty links', () => {
+      const html = '<a href="https://example.com"></a>';
+      const result = htmlToMarkdown(html);
+      expect(result).toBe('[](https://example.com)');
+    });
+    it('should filter out JavaScript links', () => {
+      const baseUrl = 'https://example.com';
+      const html = `
+        <div>
+          <a href="javascript:void(0);">JavaScript Link</a>
+          <a href="javascript:alert('test')">Alert Link</a>
+          <a href="https://example.com/valid">Valid Link</a>
+          <a href="/document.pdf">PDF Link</a>
+        </div>
+      `;
+      const result = htmlToMarkdown(html, baseUrl);
+      
+      // Should filter out JavaScript links but keep valid links
+      expect(result).not.toContain('javascript:');
+      expect(result).toContain('[Valid Link](https://example.com/valid)');
+      expect(result).toContain('[PDF Link](https://example.com/document.pdf)');
+      expect(result).toContain('JavaScript Link'); // Text content should remain
+      expect(result).toContain('Alert Link'); // Text content should remain
+    });
+  });
+
+  describe('PDF and document links', () => {
+    it('should convert PDF links to absolute URLs', () => {
+      const baseUrl = 'https://example.com/page';
+      const html = '<a href="/documents/report.pdf">Download Report</a>';
+      const result = htmlToMarkdown(html, baseUrl);
+      expect(result).toBe('[Download Report](https://example.com/documents/report.pdf)');
+    });
+
+    it('should handle relative document paths', () => {
+      const baseUrl = 'https://example.com/section/';
+      const html = '<a href="../files/doc.pdf">Document</a> <a href="./data.xlsx">Spreadsheet</a>';
+      const result = htmlToMarkdown(html, baseUrl);
+      expect(result).toBe('[Document](https://example.com/files/doc.pdf) [Spreadsheet](https://example.com/section/data.xlsx)');
+    });
+
+    it('should preserve query parameters in document URLs', () => {
+      const baseUrl = 'https://example.com';
+      const html = '<a href="/download.pdf?version=2&format=pdf">Download PDF v2</a>';
+      const result = htmlToMarkdown(html, baseUrl);
+      expect(result).toBe('[Download PDF v2](https://example.com/download.pdf?version=2&format=pdf)');
+    });
   });
 
   describe('edge cases', () => {
@@ -151,6 +225,13 @@ describe('htmlToMarkdown', () => {
     it('should normalize excessive newlines', () => {
       const html = '<p>Para 1</p>\n\n\n<p>Para 2</p>';
       expect(htmlToMarkdown(html)).toBe('Para 1\n\nPara 2');
+    });
+
+    it('should handle malformed HTML gracefully', () => {
+      const html = '<p>Unclosed paragraph<div>Nested div</p></div>';
+      const result = htmlToMarkdown(html);
+      expect(result).toContain('Unclosed paragraph');
+      expect(result).toContain('Nested div');
     });
   });
 });

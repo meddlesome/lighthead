@@ -26,7 +26,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "playwright-core": "^1.40.0"
+    "playwright-core": "^1.40.0",
+    "turndown": "^7.2.0"
   },
   "keywords": [
     "scraper",
@@ -42,6 +43,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.3",
     "@types/supertest": "^6.0.3",
+    "@types/turndown": "^5.0.5",
     "jest": "^30.0.2",
     "supertest": "^7.1.1",
     "ts-jest": "^29.4.0",

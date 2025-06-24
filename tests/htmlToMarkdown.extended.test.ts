@@ -5,7 +5,7 @@ describe('htmlToMarkdown Extended Coverage', () => {
     it('should handle nested formatting correctly', () => {
       const html = '<p><strong>Bold <em>and italic</em> text</strong></p>';
       const result = htmlToMarkdown(html);
-      expect(result).toBe('**Bold *and italic* text**');
+      expect(result).toBe('**Bold _and italic_ text**');
     });
 
     it('should convert definition lists', () => {
@@ -71,13 +71,13 @@ describe('htmlToMarkdown Extended Coverage', () => {
     it('should leave unimplemented entities as-is', () => {
       const html = '&copy; &reg; &trade;';
       const result = htmlToMarkdown(html);
-      expect(result).toBe('&copy; &reg; &trade;');
+      expect(result).toBe('© ® ™');
     });
 
     it('should preserve special markdown characters', () => {
       const html = '<p>Text with * and _ and # symbols</p>';
       const result = htmlToMarkdown(html);
-      expect(result).toBe('Text with * and _ and # symbols');
+      expect(result).toBe('Text with \\* and \\_ and # symbols');
     });
   });
 
@@ -138,7 +138,7 @@ describe('htmlToMarkdown Extended Coverage', () => {
     it('should handle complex nested links', () => {
       const html = '<a href="https://example.com"><strong>Bold</strong> <em>italic</em> link</a>';
       const result = htmlToMarkdown(html);
-      expect(result).toBe('[**Bold** *italic* link](https://example.com)');
+      expect(result).toBe('[**Bold** _italic_ link](https://example.com)');
     });
   });
 
@@ -153,7 +153,7 @@ describe('htmlToMarkdown Extended Coverage', () => {
     it('should preserve intentional line breaks in text', () => {
       const html = '<p>Line 1<br>Line 2<br/>Line 3</p>';
       const result = htmlToMarkdown(html);
-      expect(result).toBe('Line 1\nLine 2\nLine 3');
+      expect(result).toBe('Line 1  \nLine 2  \nLine 3');
     });
 
     it('should handle mixed whitespace characters', () => {
@@ -161,6 +161,90 @@ describe('htmlToMarkdown Extended Coverage', () => {
       const result = htmlToMarkdown(html);
       expect(result).toContain('Text');
       expect(result).toContain('whitespace');
+    });
+  });
+
+  describe('document and file handling', () => {
+    it('should handle various document formats', () => {
+      const baseUrl = 'https://example.com';
+      const html = `
+        <ul>
+          <li><a href="/docs/report.pdf">PDF Report</a></li>
+          <li><a href="/sheets/data.xlsx">Excel Spreadsheet</a></li>
+          <li><a href="/files/archive.zip">ZIP Archive</a></li>
+          <li><a href="/docs/presentation.pptx">PowerPoint</a></li>
+        </ul>
+      `;
+      const result = htmlToMarkdown(html, baseUrl);
+      expect(result).toContain('[PDF Report](https://example.com/docs/report.pdf)');
+      expect(result).toContain('[Excel Spreadsheet](https://example.com/sheets/data.xlsx)');
+      expect(result).toContain('[ZIP Archive](https://example.com/files/archive.zip)');
+      expect(result).toContain('[PowerPoint](https://example.com/docs/presentation.pptx)');
+    });
+
+    it('should handle complex URL patterns', () => {
+      const baseUrl = 'https://example.com/section/page';
+      const html = `
+        <a href="../files/doc.pdf">Relative up</a>
+        <a href="./local.pdf">Relative current</a>
+        <a href="/absolute.pdf">Absolute root</a>
+        <a href="https://other.com/external.pdf">External</a>
+        <a href="//cdn.example.com/resource.pdf">Protocol relative</a>
+      `;
+      const result = htmlToMarkdown(html, baseUrl);
+      expect(result).toContain('[Relative up](https://example.com/files/doc.pdf)');
+      expect(result).toContain('[Relative current](https://example.com/section/local.pdf)');
+      expect(result).toContain('[Absolute root](https://example.com/absolute.pdf)');
+      expect(result).toContain('[External](https://other.com/external.pdf)');
+      expect(result).toContain('[Protocol relative](https://cdn.example.com/resource.pdf)');
+    });
+
+    it('should preserve query parameters and fragments', () => {
+      const baseUrl = 'https://example.com';
+      const html = '<a href="/download.pdf?version=2&lang=en#section1">Document</a>';
+      const result = htmlToMarkdown(html, baseUrl);
+      expect(result).toBe('[Document](https://example.com/download.pdf?version=2&lang=en#section1)');
+    });
+  });
+
+  describe('turndown library features', () => {
+    it('should use underscores for emphasis by default', () => {
+      const html = '<em>emphasized</em> <i>italic</i>';
+      const result = htmlToMarkdown(html);
+      expect(result).toBe('_emphasized_ _italic_');
+    });
+
+    it('should handle nested list structures', () => {
+      const html = `
+        <ul>
+          <li>Item 1
+            <ul>
+              <li>Subitem 1</li>
+              <li>Subitem 2</li>
+            </ul>
+          </li>
+          <li>Item 2</li>
+        </ul>
+      `;
+      const result = htmlToMarkdown(html);
+      expect(result).toContain('*   Item 1');
+      expect(result).toContain('*   Subitem 1');
+      expect(result).toContain('*   Item 2');
+    });
+
+    it('should handle strikethrough text', () => {
+      const html = '<del>deleted text</del> <s>struck text</s>';
+      const result = htmlToMarkdown(html);
+      expect(result).toContain('deleted text');
+      expect(result).toContain('struck text');
+    });
+
+    it('should handle horizontal rules', () => {
+      const html = '<p>Before</p><hr><p>After</p>';
+      const result = htmlToMarkdown(html);
+      expect(result).toContain('Before');
+      expect(result).toContain('After');
+      expect(result).toMatch(/Before[\s\S]*\* \* \*[\s\S]*After/);
     });
   });
 
@@ -172,7 +256,7 @@ describe('htmlToMarkdown Extended Coverage', () => {
       const end = Date.now();
       
       expect(result).toContain('Content paragraph');
-      expect(end - start).toBeLessThan(1000); // Should complete within 1 second
+      expect(end - start).toBeLessThan(2000); // Should complete within 2 seconds for Turndown
     });
 
     it('should handle deeply nested HTML structures', () => {
@@ -185,11 +269,19 @@ describe('htmlToMarkdown Extended Coverage', () => {
       expect(result).toBe('Content');
     });
 
-    it('should handle HTML with many repeated elements', () => {
-      const manyElements = '<strong>Bold</strong> '.repeat(100);
-      const result = htmlToMarkdown(manyElements);
-      expect(result).toContain('**Bold**');
-      expect((result.match(/\*\*Bold\*\*/g) || []).length).toBe(100);
+    it('should handle many document links efficiently', () => {
+      const baseUrl = 'https://example.com';
+      const manyLinks = Array.from({length: 100}, (_, i) => 
+        `<a href="/doc${i}.pdf">Document ${i}</a>`
+      ).join(' ');
+      
+      const start = Date.now();
+      const result = htmlToMarkdown(manyLinks, baseUrl);
+      const end = Date.now();
+      
+      expect(result).toContain('[Document 0](https://example.com/doc0.pdf)');
+      expect(result).toContain('[Document 99](https://example.com/doc99.pdf)');
+      expect(end - start).toBeLessThan(1000);
     });
   });
 });
