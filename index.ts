@@ -373,9 +373,27 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
     }
     
     let response: Response | null = null;
+    
+    if (verbose) {
+      console.error('\n=== BROWSER NAVIGATION START ===');
+      console.error('Starting page.goto() with waitUntil:', gotoOptions.waitUntil);
+      console.error('Navigation timeout:', gotoOptions.timeout, 'ms');
+    }
+    
     try {
       response = await page.goto(url, gotoOptions);
+      
+      if (verbose) {
+        console.error('\n=== NAVIGATION COMPLETED ===');
+        console.error('page.goto() returned successfully');
+        console.error('Response status:', response?.status(), response?.statusText());
+      }
     } catch (error) {
+      if (verbose) {
+        console.error('\n=== NAVIGATION FAILED ===');
+        console.error('page.goto() error:', (error as Error).message);
+      }
+      
       // For PDFs, ERR_ABORTED might be expected when download is triggered
       if (url.toLowerCase().includes('.pdf') && (error as Error).message.includes('ERR_ABORTED')) {
         if (verbose) {
@@ -404,28 +422,85 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
       throw new Error('Failed to load page');
     }
     
-    // Log content status before waiting for network idle
+    if (verbose) {
+      console.error('\n=== BROWSER LIFECYCLE CHECK ===');
+      
+      // Check current load state
+      try {
+        const loadState = await page.evaluate(() => document.readyState);
+        console.error('Document ready state:', loadState);
+      } catch (e) {
+        console.error('Failed to get document ready state:', (e as Error).message);
+      }
+      
+      // Check if there are pending network requests
+      try {
+        const networkActivity = await page.evaluate(() => {
+          return {
+            activeRequests: (performance as any).getEntriesByType?.('navigation')?.length || 0,
+            documentLoaded: document.readyState === 'complete',
+            imagesLoaded: Array.from(document.images).every(img => img.complete),
+            scriptsCount: document.scripts.length,
+            stylesheetsCount: document.styleSheets.length
+          };
+        });
+        console.error('Network activity status:', JSON.stringify(networkActivity, null, 2));
+      } catch (e) {
+        console.error('Failed to check network activity:', (e as Error).message);
+      }
+    }
+
+    // Log content status immediately after navigation
     if (verbose) {
       try {
+        console.error('\n=== IMMEDIATE CONTENT STATUS ===');
         const contentPreview = await page.content();
-        console.error('\n=== CONTENT PREVIEW (before network idle) ===');
-        console.error('Content length:', contentPreview.length, 'characters');
-        console.error('Content preview:', contentPreview.substring(0, 200).replace(/\s+/g, ' '));
+        console.error('Raw DOM content length:', contentPreview.length, 'characters');
         console.error('Page title:', await page.title());
+        console.error('Current URL:', page.url());
+        console.error('Content preview (first 200 chars):', contentPreview.substring(0, 200).replace(/\s+/g, ' '));
+        
+        // Check if we can get the original response text
+        if (response) {
+          try {
+            const responseText = await response.text();
+            console.error('Original HTTP response length:', responseText.length, 'characters');
+            console.error('Response text preview (first 200 chars):', responseText.substring(0, 200).replace(/\s+/g, ' '));
+          } catch (e) {
+            console.error('Failed to get response.text():', (e as Error).message);
+          }
+        }
       } catch (e) {
-        console.error('Failed to get content preview:', (e as Error).message);
+        console.error('Failed to get immediate content status:', (e as Error).message);
       }
     }
 
     // Wait for all network activity to settle after initial load
+    if (verbose) {
+      console.error('\n=== NETWORK IDLE WAIT START ===');
+      console.error('Starting waitForLoadState("networkidle") with 10s timeout...');
+    }
+    
     try {
       await page.waitForLoadState('networkidle', { timeout: 10000 });
       if (verbose) {
-        console.error('Network idle completed successfully');
+        console.error('✅ Network idle completed successfully');
       }
     } catch (error) {
       if (verbose) {
-        console.error('Network idle timeout reached, proceeding...');
+        console.error('⚠️ Network idle timeout reached, proceeding...');
+        console.error('Network idle error:', (error as Error).message);
+      }
+    }
+    
+    if (verbose) {
+      console.error('\n=== POST-NETWORK-IDLE CONTENT STATUS ===');
+      try {
+        const finalContentPreview = await page.content();
+        console.error('Final DOM content length:', finalContentPreview.length, 'characters');
+        console.error('Final page title:', await page.title());
+      } catch (e) {
+        console.error('Failed to get final content status:', (e as Error).message);
       }
     }
     
