@@ -35,6 +35,7 @@ interface HtmlResult {
   finalUrl: string;
   redirectChain: RedirectInfo[];
   response: ResponseInfo;
+  contentSource: 'full' | 'partial' | 'minimal';
 }
 
 interface BinaryResult {
@@ -46,6 +47,7 @@ interface BinaryResult {
   finalUrl: string;
   redirectChain: RedirectInfo[];
   response: ResponseInfo;
+  contentSource: 'full' | 'partial' | 'minimal';
 }
 
 type ScrapeResult = HtmlResult | BinaryResult;
@@ -352,7 +354,7 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
     
     const gotoOptions: any = {
       waitUntil: 'load',
-      timeout: 60000
+      timeout: 30000  // Reduced timeout for first attempt
     };
     
     if (!followRedirects) {
@@ -373,6 +375,7 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
     }
     
     let response: Response | null = null;
+    let contentSource: 'full' | 'partial' | 'minimal' = 'full';
     
     if (verbose) {
       console.error('\n=== BROWSER NAVIGATION START ===');
@@ -385,9 +388,11 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
       
       if (verbose) {
         console.error('\n=== NAVIGATION COMPLETED ===');
-        console.error('page.goto() returned successfully');
+        console.error('page.goto() returned successfully with waitUntil:', gotoOptions.waitUntil);
         console.error('Response status:', response?.status(), response?.statusText());
+        console.error('Content source: full (all resources loaded)');
       }
+      contentSource = 'full';
     } catch (error) {
       if (verbose) {
         console.error('\n=== NAVIGATION FAILED ===');
@@ -410,8 +415,34 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
             statusText: () => 'OK',
             headers: () => ({ 'content-type': 'application/pdf' })
           } as any;
+          contentSource = 'full'; // PDF downloads are considered complete
         } else {
           throw error;
+        }
+      } else if ((error as Error).message.includes('Timeout') && !url.toLowerCase().includes('.pdf')) {
+        // Retry with domcontentloaded for HTML pages
+        if (verbose) {
+          console.error('\n=== FALLBACK NAVIGATION START ===');
+          console.error('Retrying with waitUntil: domcontentloaded');
+        }
+        
+        try {
+          const fallbackOptions = { ...gotoOptions, waitUntil: 'domcontentloaded', timeout: 30000 };
+          response = await page.goto(url, fallbackOptions);
+          
+          if (verbose) {
+            console.error('\n=== FALLBACK NAVIGATION COMPLETED ===');
+            console.error('page.goto() succeeded with waitUntil: domcontentloaded');
+            console.error('Response status:', response?.status(), response?.statusText());
+            console.error('Content source: partial (DOM loaded, some resources may have failed)');
+          }
+          contentSource = 'partial';
+        } catch (fallbackError) {
+          if (verbose) {
+            console.error('\n=== FALLBACK NAVIGATION FAILED ===');
+            console.error('Fallback navigation error:', (fallbackError as Error).message);
+          }
+          throw fallbackError;
         }
       } else {
         throw error;
@@ -488,9 +519,10 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
       }
     } catch (error) {
       if (verbose) {
-        console.error('⚠️ Network idle timeout reached, proceeding...');
+        console.error('⚠️ Network idle timeout - continuing with current content');
         console.error('Network idle error:', (error as Error).message);
       }
+      // Don't downgrade contentSource - network idle timeout doesn't affect core content completeness
     }
     
     if (verbose) {
@@ -550,7 +582,8 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
           status: response.status(),
           statusText: response.statusText(),
           headers: response.headers()
-        }
+        },
+        contentSource
       };
       
       if (cookieFile) {
@@ -630,7 +663,8 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
           status: response.status(),
           statusText: response.statusText(),
           headers: response.headers()
-        }
+        },
+        contentSource
       };
       
       if (cookieFile) {
@@ -674,7 +708,8 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
           status: response.status(),
           statusText: response.statusText(),
           headers: response.headers()
-        }
+        },
+        contentSource
       };
       
       if (cookieFile) {
@@ -839,6 +874,7 @@ Examples:
     if (verbose) {
       console.error('\n=== SCRAPING COMPLETED ===');
       console.error('Result type:', result.type);
+      console.error('Content source:', result.contentSource);
       if (result.response) {
         console.error('Final status:', result.response.status, result.response.statusText);
       }
@@ -864,7 +900,9 @@ Examples:
       
       if (outputFile) {
         fs.writeFileSync(outputFile, output, 'utf8');
-        console.error('Saved to:', outputFile);
+        const sourceMsg = result.contentSource === 'full' ? '' : 
+                         result.contentSource === 'partial' ? ' (partial content)' : ' (minimal content)';
+        console.error('Saved to:', outputFile + sourceMsg);
       } else {
         console.log(output);
       }
@@ -872,7 +910,9 @@ Examples:
     } else if (result.type === 'binary') {
       if (download) {
         fs.writeFileSync(result.filename, result.buffer);
-        console.error('Downloaded:', result.filename);
+        const sourceMsg = result.contentSource === 'full' ? '' : 
+                         result.contentSource === 'partial' ? ' (partial content)' : ' (minimal content)';
+        console.error('Downloaded:', result.filename + sourceMsg);
       } else {
         console.error('Binary file detected. Use --download to save it.');
         console.error('Content-Type:', result.contentType);

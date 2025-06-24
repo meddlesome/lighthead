@@ -158,6 +158,35 @@ curl "http://localhost:3005/scrape?url=https://example.com/doc.pdf&format=binary
 - **All responses:** JSON format with content in the `output` field
 - **Binary files:** Direct download when `format=binary`, metadata when no format specified
 
+### Content Source Quality
+
+All API responses include a `contentSource` field indicating the completeness of the extracted content:
+
+| Value | Description | Quality Level |
+|-------|-------------|---------------|
+| `"full"` | All resources loaded successfully (complete JavaScript execution) | ✅ **Best** - Ideal for LLM analysis |
+| `"partial"` | DOM loaded + some JavaScript, but some resources failed to load | ⚠️ **Good** - Most content available |
+| `"minimal"` | Basic DOM only, limited or no JavaScript execution | ⚠️ **Basic** - Raw HTML content |
+
+**Example API Response:**
+```json
+{
+  "success": true,
+  "status": "completed",
+  "contentSource": "full",
+  "outputLength": 1234,
+  "output": "# Page Title\n\nContent here...",
+  "format": "markdown",
+  "finalUrl": "https://example.com",
+  "redirectCount": 0
+}
+```
+
+**Adaptive Loading Strategy:**
+1. **First attempt:** `waitUntil: 'load'` (30s timeout) → `contentSource: "full"`
+2. **Fallback:** `waitUntil: 'domcontentloaded'` → `contentSource: "partial"` 
+3. **Final fallback:** Basic DOM extraction → `contentSource: "minimal"`
+
 ## 🎯 Use Cases
 
 - **Web Scraping** - Extract content from protected websites
