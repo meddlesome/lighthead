@@ -35,7 +35,7 @@ npm start -- -v https://protected-site.com --format markdown --cookies auth.json
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
 | `<url>` | string | **required** | Target URL to scrape |
-| `--format <format>` | string | `html` | Output format: `html`, `markdown`, `text` |
+| `--format <format>` | string | `html` | Output format: `html`, `markdown`, `text`, `binary` |
 | `--output <file>` | string | `stdout` | Save output to file instead of stdout |
 | `--download` | flag | `false` | Download binary files (PDFs, images, etc.) |
 | `--cookies <file>` | string | `none` | Load/save cookies from/to JSON file |
@@ -53,7 +53,8 @@ npm start -- https://example.com --format markdown
 npm start -- https://example.com --format text --output content.txt
 
 # Binary file downloads
-npm start -- https://example.com/document.pdf --download
+npm start -- https://example.com/document.pdf --format binary
+npm start -- https://example.com/document.pdf --download  # Legacy flag
 
 # Session management
 npm start -- https://example.com --cookies session.json
@@ -157,6 +158,8 @@ curl "http://localhost:3005/scrape?url=https://example.com/doc.pdf&format=binary
 - **Default:** `markdown` (changed from `json` for better usability)
 - **All responses:** JSON format with content in the `output` field
 - **Binary files:** Direct download when `format=binary`, metadata when no format specified
+- **Content-Disposition:** Handles both `inline` and `attachment` binary content automatically
+- **Filenames:** Extracted from Content-Disposition headers when available
 
 ### Content Source Quality
 

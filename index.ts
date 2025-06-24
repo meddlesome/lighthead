@@ -341,9 +341,10 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
           console.error('From:', response.url());
           console.error('To:', location);
           console.error('Status:', status, response.statusText());
-        } else if (response.url() === url || redirectChain.length > 0) {
+        } else {
           console.error('\n=== HTTP RESPONSE ===');
           console.error('Status:', response.status(), response.statusText());
+          console.error('Response URL:', response.url());
           console.error('Headers:', JSON.stringify(response.headers(), null, 2));
           if (redirectChain.length > 0) {
             console.error('Redirect chain:', redirectChain.length, 'redirects');
@@ -399,25 +400,51 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
         console.error('page.goto() error:', (error as Error).message);
       }
       
-      // For PDFs, ERR_ABORTED might be expected when download is triggered
-      if (url.toLowerCase().includes('.pdf') && (error as Error).message.includes('ERR_ABORTED')) {
+      // For binary content, ERR_ABORTED might be expected for downloads or inline display
+      if ((error as Error).message.includes('ERR_ABORTED')) {
         if (verbose) {
-          console.error('Navigation aborted (expected for PDF download)');
+          console.error('Navigation aborted (likely binary content)');
         }
-        // Wait for download to complete
+        // Wait for potential download to complete
         await page.waitForTimeout(3000);
         
         if (downloadInfo) {
-          // Create a mock response for the download case
+          // Handle download case - trust the response headers
           response = {
             url: () => url,
             status: () => 200,
             statusText: () => 'OK',
-            headers: () => ({ 'content-type': 'application/pdf' })
+            headers: () => downloadInfo.responseHeaders || { 'content-type': 'application/octet-stream' }
           } as any;
-          contentSource = 'full'; // PDF downloads are considered complete
+          contentSource = 'full';
         } else {
-          throw error;
+          // Check if this is inline binary content that we can fetch directly
+          const responseFromRequest = await page.request.get(url);
+          const responseHeaders = responseFromRequest.headers();
+          const responseContentType = responseHeaders['content-type'] || '';
+          const responseContentDisposition = responseHeaders['content-disposition'] || '';
+          
+          const isInlineBinaryContent = responseContentDisposition.toLowerCase().includes('inline') && 
+            !responseContentType.includes('text/html') && 
+            !responseContentType.includes('text/xml') && 
+            !responseContentType.includes('application/xhtml');
+          
+          if (isInlineBinaryContent) {
+            if (verbose) {
+              console.error('Detected inline binary content, using direct request');
+            }
+            // Create response-like object for inline binary content
+            response = {
+              url: () => url,
+              status: () => responseFromRequest.status(),
+              statusText: () => responseFromRequest.statusText(),
+              headers: () => responseHeaders,
+              body: () => responseFromRequest.body()
+            } as any;
+            contentSource = 'full';
+          } else {
+            throw error;
+          }
         }
       } else if ((error as Error).message.includes('Timeout') && !url.toLowerCase().includes('.pdf')) {
         // Retry with domcontentloaded for HTML pages
@@ -604,11 +631,13 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
     }
     
     const contentType = response.headers()['content-type'] || '';
+    const contentDisposition = response.headers()['content-disposition'] || '';
+    const isInline = contentDisposition.toLowerCase().includes('inline');
+    const isAttachment = contentDisposition.toLowerCase().includes('attachment');
     
     if (verbose) {
       console.error('\n=== RESPONSE ANALYSIS ===');
-      console.error('Content-Type:', contentType);
-      console.error('Content-Length:', response.headers()['content-length'] || 'unknown');
+      console.error('All Response Headers:', JSON.stringify(response.headers(), null, 2));
     }
     
     if (contentType.includes('text/html')) {
@@ -685,15 +714,22 @@ export async function scrapeUrl(url: string, options: ScrapeOptions = {}): Promi
     } else {
       if (verbose) {
         console.error('Processing binary content...');
+        console.error('Content-Disposition:', isInline ? 'inline' : isAttachment ? 'attachment' : 'not specified');
       }
       
       const buffer = await response.body();
       const extension = getFileExtension(url, contentType);
-      const filename = `download_${Date.now()}${extension}`;
+      
+      // Extract filename from Content-Disposition if available
+      let filename = `download_${Date.now()}${extension}`;
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch) {
+        filename = decodeURIComponent(filenameMatch[1].replace(/['"]/g, ''));
+      }
       
       if (verbose) {
         console.error('Binary size:', buffer.length, 'bytes');
-        console.error('Suggested filename:', filename);
+        console.error('Extracted filename:', filename);
       }
       
       const result: BinaryResult = {
@@ -751,7 +787,7 @@ export function validateUrl(url: string): void {
 }
 
 export function validateFormat(format: string): void {
-  const validFormats = ['html', 'markdown', 'md', 'text', 'txt'];
+  const validFormats = ['html', 'markdown', 'md', 'text', 'txt', 'binary'];
   if (!validFormats.includes(format.toLowerCase())) {
     throw new Error(`Invalid format: ${format}. Valid formats are: ${validFormats.join(', ')}`);
   }
