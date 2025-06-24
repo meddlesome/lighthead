@@ -59,6 +59,7 @@ interface ApiResponse {
   contentType?: string;
   finalUrl?: string;
   redirectCount?: number;
+  contentSource?: 'full' | 'partial' | 'minimal';
 }
 
 // API Key middleware (optional)
@@ -302,7 +303,8 @@ app.get('/scrape', authenticateApiKey, async (req, res): Promise<void> => {
         output,
         format: outputFormat,
         finalUrl: result.finalUrl,
-        redirectCount: result.redirectChain.length
+        redirectCount: result.redirectChain.length,
+        contentSource: result.contentSource
       };
       
     } else if (result.type === 'binary') {
@@ -321,6 +323,7 @@ app.get('/scrape', authenticateApiKey, async (req, res): Promise<void> => {
         contentType: result.contentType,
         finalUrl: result.finalUrl,
         redirectCount: result.redirectChain.length,
+        contentSource: result.contentSource,
         data: {
           type: 'binary',
           filename: result.filename,

@@ -32,8 +32,10 @@ describe('Core Validation Functions', () => {
       expect(() => validateFormat('md')).not.toThrow();
       expect(() => validateFormat('text')).not.toThrow();
       expect(() => validateFormat('txt')).not.toThrow();
+      expect(() => validateFormat('binary')).not.toThrow();
       expect(() => validateFormat('HTML')).not.toThrow();
       expect(() => validateFormat('MARKDOWN')).not.toThrow();
+      expect(() => validateFormat('BINARY')).not.toThrow();
     });
 
     it('should reject invalid formats', () => {
